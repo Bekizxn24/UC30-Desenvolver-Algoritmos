@@ -1,11 +1,15 @@
-def soma_segura(a, b):
+def soma_segura (a, b):
     try:
-        resultado = a + b
-        return resultado
+        soma = a + b
+        return soma
     except TypeError:
-        print("Entrada inválida")
+        print ("Entrada inválida!")
         return 0
 
-# Testes
-print(soma_segura(10, 5))      
-print(soma_segura(10, "5"))    
+
+def divisao (x, y):
+    try:
+        quociente = x / y
+        return quociente
+    except ZeroDivisionError:
+        return "Não da pra dividir por zero!"
