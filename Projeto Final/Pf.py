@@ -1,13 +1,43 @@
+import json
+import os
+
+ARQUIVO = "dados.json"
+
 fila_prioritaria = []
 fila_normal = []
+historico = []
 
-# ================= VALIDAÇÕES =================
+# ================== ARQUIVO ==================
+
+def salvar_dados():
+    dados = {
+        "prioritaria": fila_prioritaria,
+        "normal": fila_normal,
+        "historico": historico
+    }
+    with open(ARQUIVO, "w") as f:
+        json.dump(dados, f, indent=4)
+
+def carregar_dados():
+    global fila_prioritaria, fila_normal, historico
+
+    if os.path.exists(ARQUIVO):
+        with open(ARQUIVO, "r") as f:
+            dados = json.load(f)
+            fila_prioritaria = dados.get("prioritaria", [])
+            fila_normal = dados.get("normal", [])
+            historico = dados.get("historico", [])
+
+# ================== VALIDAÇÕES ==================
+
 def validar_sn(msg):
     while True:
-        resp = input(msg).upper()
-        if resp in ["S", "N"]:
-            return resp
-        print("Digite apenas S ou N!")
+        resp = input(msg).strip().lower()
+        if resp in ["s", "sim"]:
+            return True
+        elif resp in ["n", "nao", "não"]:
+            return False
+        print("Digite S/Sim ou N/Não!")
 
 def validar_int(msg):
     while True:
@@ -17,126 +47,169 @@ def validar_int(msg):
                 print("Valor inválido!")
             else:
                 return valor
-        except:
+        except ValueError:
             print("Digite um número válido!")
 
-# ================= CADASTRO =================
-def cadastrar_pessoa():
-    print("\n=== CADASTRAR PESSOA ===")
-    
-    nome = input("Nome: ")
+def validar_cpf():
+    while True:
+        cpf = input("CPF (11 números): ").strip()
+
+        if not cpf.isdigit() or len(cpf) != 11:
+            print("CPF inválido!")
+            continue
+
+        if buscar_por_cpf(cpf, mostrar=False):
+            print("CPF já cadastrado!")
+            continue
+
+        return cpf
+
+# ================== FUNÇÕES ==================
+
+def cadastrar():
+    print("\n=== CADASTRO ===")
+
+    nome = input("Nome: ").strip()
+    cpf = validar_cpf()
     idade = validar_int("Idade: ")
     deficiencia = validar_sn("Possui deficiência? (S/N): ")
-    gestante = validar_sn("Está gestante? (S/N): ")
+    gestante = validar_sn("Gestante? (S/N): ")
 
-    prioridade = idade >= 60 or deficiencia == "S" or gestante == "S"
+    prioridade = idade >= 60 or deficiencia or gestante
 
     pessoa = {
         "nome": nome,
+        "cpf": cpf,
         "idade": idade,
         "prioridade": prioridade
     }
 
     if prioridade:
         fila_prioritaria.append(pessoa)
-        print("✅ Adicionado à FILA PRIORITÁRIA!")
     else:
         fila_normal.append(pessoa)
-        print("✅ Adicionado à fila normal!")
 
-# ================= MOSTRAR FILA =================
-def mostrar_fila():
-    print("\n=== FILA DE ATENDIMENTO ===")
+    salvar_dados()
+    print("✅ Pessoa cadastrada!")
 
-    print(f"\n🔴 Prioridade ({len(fila_prioritaria)} pessoas):")
-    for i, p in enumerate(fila_prioritaria, 1):
-        print(f"{i}. {p['nome']} ({p['idade']} anos)")
+def listar():
+    print("\n=== FILAS ===")
 
-    print(f"\n🟢 Normal ({len(fila_normal)} pessoas):")
-    for i, p in enumerate(fila_normal, 1):
-        print(f"{i}. {p['nome']} ({p['idade']} anos)")
+    print("\n🔴 PRIORIDADE:")
+    for p in fila_prioritaria:
+        print(f"{p['nome']} | CPF: {p['cpf']}")
 
-# ================= ATENDER =================
-def atender_proximo():
+    print("\n🟢 NORMAL:")
+    for p in fila_normal:
+        print(f"{p['nome']} | CPF: {p['cpf']}")
+
+def atender():
     print("\n=== ATENDIMENTO ===")
 
     if fila_prioritaria:
         pessoa = fila_prioritaria.pop(0)
-        print(f"🔴 Atendendo (PRIORIDADE): {pessoa['nome']}")
     elif fila_normal:
         pessoa = fila_normal.pop(0)
-        print(f"🟢 Atendendo: {pessoa['nome']}")
     else:
         print("Fila vazia!")
+        return
 
-# ================= BUSCAR =================
-def buscar_pessoa():
-    nome = input("Digite o nome para buscar: ").lower()
+    historico.append(pessoa)
+    salvar_dados()
 
-    for p in fila_prioritaria:
-        if p["nome"].lower() == nome:
-            print(f"Encontrado na FILA PRIORITÁRIA: {p['nome']}")
-            return
+    print(f"Atendendo: {pessoa['nome']}")
 
-    for p in fila_normal:
-        if p["nome"].lower() == nome:
-            print(f"Encontrado na fila normal: {p['nome']}")
-            return
+def buscar_por_cpf(cpf=None, mostrar=True):
+    if not cpf:
+        cpf = input("CPF: ")
 
-    print("Pessoa não encontrada!")
+    for p in fila_prioritaria + fila_normal:
+        if p["cpf"] == cpf:
+            if mostrar:
+                print(f"Encontrado: {p['nome']}")
+            return p
 
-# ================= REMOVER =================
-def remover_pessoa():
-    nome = input("Digite o nome para remover: ").lower()
+    if mostrar:
+        print("Não encontrado!")
+    return None
+
+def remover():
+    cpf = input("CPF para remover: ")
 
     for fila in [fila_prioritaria, fila_normal]:
         for p in fila:
-            if p["nome"].lower() == nome:
+            if p["cpf"] == cpf:
                 fila.remove(p)
-                print("Pessoa removida com sucesso!")
+                salvar_dados()
+                print("Removido!")
                 return
 
-    print("Pessoa não encontrada!")
+    print("Não encontrado!")
 
-# ================= LIMPAR FILAS =================
-def limpar_filas():
-    confirmacao = validar_sn("Tem certeza que deseja limpar todas as filas? (S/N): ")
-    
-    if confirmacao == "S":
-        fila_prioritaria.clear()
-        fila_normal.clear()
-        print("Filas limpas com sucesso!")
-    else:
-        print("Operação cancelada.")
+def editar():
+    cpf = input("CPF para editar: ")
+    pessoa = buscar_por_cpf(cpf, mostrar=False)
 
-# ================= MENU =================
+    if not pessoa:
+        print("Pessoa não encontrada!")
+        return
+
+    print("Deixe vazio para não alterar")
+
+    novo_nome = input("Novo nome: ")
+    if novo_nome:
+        pessoa["nome"] = novo_nome
+
+    salvar_dados()
+    print("Atualizado!")
+
+def tempo_espera():
+    total = len(fila_prioritaria) + len(fila_normal)
+    tempo = total * 5
+    print(f"Tempo estimado: {tempo} minutos")
+
+def ver_historico():
+    print("\n=== HISTÓRICO ===")
+    for p in historico:
+        print(f"{p['nome']} | CPF: {p['cpf']}")
+
+# ================== MENU ==================
+
 def menu():
+    carregar_dados()
+
     while True:
-        print("\n====== SISTEMA DE ATENDIMENTO ======")
-        print("1 - Cadastrar pessoa")
-        print("2 - Mostrar filas")
-        print("3 - Atender próxima pessoa")
-        print("4 - Buscar pessoa")
-        print("5 - Remover pessoa")
-        print("6 - Limpar filas")
-        print("7 - Sair")
+        print("\n===== SISTEMA =====")
+        print("1 - Cadastrar")
+        print("2 - Listar filas")
+        print("3 - Atender")
+        print("4 - Buscar")
+        print("5 - Remover")
+        print("6 - Editar")
+        print("7 - Tempo de espera")
+        print("8 - Histórico")
+        print("9 - Sair")
 
-        opcao = input("Escolha: ")
+        op = input("Opção: ")
 
-        if opcao == "1":
-            cadastrar_pessoa()
-        elif opcao == "2":
-            mostrar_fila()
-        elif opcao == "3":
-            atender_proximo()
-        elif opcao == "4":
-            buscar_pessoa()
-        elif opcao == "5":
-            remover_pessoa()
-        elif opcao == "6":
-            limpar_filas()
-        elif opcao == "7":
-            print("Encerrando sistema...")
+        if op == "1":
+            cadastrar()
+        elif op == "2":
+            listar()
+        elif op == "3":
+            atender()
+        elif op == "4":
+            buscar_por_cpf()
+        elif op == "5":
+            remover()
+        elif op == "6":
+            editar()
+        elif op == "7":
+            tempo_espera()
+        elif op == "8":
+            ver_historico()
+        elif op == "9":
+            print("Saindo...")
             break
         else:
             print("Opção inválida!")
